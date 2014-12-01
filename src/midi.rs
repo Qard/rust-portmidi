@@ -1,7 +1,7 @@
 /*!
 * Function of PortMidi
 */
-
+extern crate core;
 
 use std::{ptr};
 use core::mem::transmute;
@@ -595,6 +595,7 @@ impl PmOutputPort {
             c_pm_stream : ptr::null(),
             output_device : output_device as i32,
             buffer_size : buffer_size as i32,
+            opened : false
         }
     }
 
