@@ -19,18 +19,18 @@ pub enum PtError {
 /*
     Pt_Sleep() pauses, allowing other threads to run.
 
-    duration is the length of the pause in ms. The true duration 
+    duration is the length of the pause in ms. The true duration
     of the pause may be rounded to the nearest or next clock tick
     as determined by resolution in Pt_Start().
 */
-pub fn Pt_Sleep(duration: i64)	{
+pub fn pt_sleep(duration: i64)	{
 	timer::sleep(duration::Duration::milliseconds(duration));
 }
 
 pub struct PtTimer	{
 	channel: Sender<String>,
 	started: bool,
-	startTime: u64,
+	start_time: u64,
 }
 
 impl PtTimer	{
@@ -47,42 +47,41 @@ impl PtTimer	{
 
 	    return value: timer always start
 	*/
-	pub fn Pt_start<T:Send> (resolution : i64, userData : T , callback: extern "Rust" fn(u64, &mut T)) -> PtTimer {
-	    let (newchan, newport): (Sender<String>, Receiver<String>) = channel();
-	    let ptimer = PtTimer {
-	    	channel: newchan,
-	    	started: true,
-	    	startTime: time::precise_time_ns(),
-	    };
+	pub fn pt_start<T:Send> (resolution : i64, user_data : T , callback: extern "Rust" fn(u64, &mut T)) -> PtTimer {
+    let (newchan, newport): (Sender<String>, Receiver<String>) = channel();
+    let ptimer = PtTimer {
+    	channel: newchan,
+    	started: true,
+    	start_time: time::precise_time_ns(),
+    };
 
-	    spawn (proc() {
+    spawn (proc() {
 			let mut timer = timer::Timer::new().unwrap();
 			let periodic = timer.periodic(duration::Duration::milliseconds(resolution));
 			let mut stop : bool = false;
 			let starttime = time::precise_time_ns();
-			let mut mutdata = userData;
+			let mut mutdata = user_data;
 			loop {
-			    periodic.recv();
-			    let now = time::precise_time_ns();
-			    callback((now - starttime) / 1000000, &mut mutdata);
-			    match newport.try_recv() {
-			    	Ok(ref message) => {
-			    	//	let local_arc : Arc<~str> = newport.recv();
-		            //	let message = arc_message.get();
-		            	if *message == "stop".to_string()	{
-		            		stop = true;
-		            	}
-			    	},	
-			    	Err(comm::Empty) => (),
-			    	Err(comm::Disconnected) => panic!("Action channel disconnect error.")
-            	}
-            	if stop	{
-            		break;
-            	}
-			}
-	    }
-	    );
-	    ptimer
+		    periodic.recv();
+		    let now = time::precise_time_ns();
+		    callback((now - starttime) / 1000000, &mut mutdata);
+		    match newport.try_recv() {
+		    	Ok(ref message) => {
+          	if *message == "stop".to_string()	{
+          		stop = true;
+          	}
+		    	},
+		    	Err(comm::Empty) => (),
+		    	Err(comm::Disconnected) => {
+            panic!("Action channel disconnect error.")
+          }
+      	}
+      	if stop	{
+      		break;
+      	}
+		  }
+    });
+    ptimer
 	}
 
 	/*
@@ -91,7 +90,7 @@ impl PtTimer	{
     return value:
     Upon success, returns ptNoError. See PtError for other values.
 */
-	pub fn  Pt_Stop(&mut self)	{
+	pub fn  pt_stop(&mut self)	{
 	    self.channel.send("stop".to_string());
 	    self.started = false;
 	}
@@ -99,22 +98,16 @@ impl PtTimer	{
 	/*
 	    Pt_Started() returns true iff the timer is running.
 	*/
-	pub fn  Pt_Started(&self) -> bool	{
+	pub fn  pt_started(&self) -> bool	{
 		self.started
 	}
 
-	/* 
+	/*
 	    Pt_Time() returns the current time in ms.
 	*/
-	pub fn Pt_Time(&self) -> u64	{
+	pub fn pt_time(&self) -> u64	{
 	    let now = time::precise_time_ns();
-	    (now - self.startTime) / 1000000
+	    (now - self.start_time) / 1000000
 	}
 
 }
-
-
-
-
-
-

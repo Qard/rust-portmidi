@@ -10,7 +10,6 @@ extern crate serialize;
 
 #[allow(non_camel_case_types)]
 pub mod midi;
-#[allow(non_snake_case_functions)]
 pub mod time;
 #[allow(non_camel_case_types)]
 pub mod util;
@@ -19,6 +18,7 @@ pub mod util;
 #[cfg(test)]
 mod tests {
     use {midi, time, util};
+    use midi::PmError;
 
     struct Sequencer   {
         midi_notes: Vec<midi::PmEvent>,
@@ -30,13 +30,13 @@ mod tests {
      //   let inport = *data.inport;
         let _ = data.midi_notes; // avoid dead code warning
 
-        while match data.inport.poll() { midi::PmGotData => true, _ => false }    {
+        while match data.inport.poll() { PmError::PmGotData => true, _ => false }    {
             // println!("portmidi input note {}", readMidi);
             match data.inport.read()    {
                 Ok(notes) => println!("portmidi read midi note {}", notes),
-                Err(midi::PmNoError) => println!("portmidi read midi no note {}", midi::PmNoError),
+                Err(PmError::PmNoError) => println!("portmidi read midi no note {}", PmError::PmNoError),
                 Err(err) => println!("portmidi read midi error {}", err)
-            } 
+            }
         }
 
     }
@@ -45,7 +45,7 @@ mod tests {
     #[test]
     fn test_midiin() {
     	let error:midi::PmError = midi::initialize();
-    	assert_eq!(error as int, midi::PmNoError as int);
+    	assert_eq!(error as int, PmError::PmNoError as int);
 
     	let nbdevice : int = midi::count_devices();
     	println!("portmidi nb device {}", nbdevice);
@@ -62,76 +62,76 @@ mod tests {
 
         let mut inport : midi::PmInputPort = midi::PmInputPort::new(defdevin, 0);
         let inerror = inport.open();
-        assert_eq!(inerror as int, midi::PmNoError as int);
+        assert_eq!(inerror as int, PmError::PmNoError as int);
 
         let mut outport : midi::PmOutputPort = midi::PmOutputPort::new(defdevout, 100);
         let outerror = outport.open();
         println!("portmidi new output device {}", outerror);
-        assert_eq!(outerror as int, midi::PmNoError as int);
+        assert_eq!(outerror as int, PmError::PmNoError as int);
 
-        let readMidi = inport.read();
-        println!("portmidi input note {}", readMidi);
-        match readMidi    {
+        let read_midi = inport.read();
+        println!("portmidi input note {}", read_midi);
+        match read_midi    {
             Ok(notes) => println!("portmidi read midi note {}", notes),
-            Err(midi::PmNoError) => println!("portmidi read midi no note {}", midi::PmNoError),
+            Err(PmError::PmNoError) => println!("portmidi read midi no note {}", PmError::PmNoError),
             Err(err) => println!("portmidi read midi error {}", err)
         }
 
         let innote = inport.poll();
-        assert_eq!(innote as int, midi::PmNoError as int);
-        
+        assert_eq!(innote as int, PmError::PmNoError as int);
+
         //send note
         let note1 = midi::PmEvent {
             message : midi::PmMessage {
                 status : 1 | 0x90, //chanell and note on
                 data1 : 36, //note number
-                data2 : 90, // velocity              
+                data2 : 90, // velocity
             },
             timestamp : 0
         };
         let sendnoteerr = outport.write_event(note1);
-        assert_eq!(sendnoteerr as int, midi::PmNoError as int);
+        assert_eq!(sendnoteerr as int, PmError::PmNoError as int);
 
         let note2 = midi::PmMessage {
             status : 1 | 0x80, //chanell and note off
             data1 : 36, //note number
-            data2 : 0, // velocity              
+            data2 : 0, // velocity
         };
         let sendnote2err = outport.write_message(note2);
-        assert_eq!(sendnote2err as int, midi::PmNoError as int);
+        assert_eq!(sendnote2err as int, PmError::PmNoError as int);
 
         //test sequencer
         let data = Sequencer{midi_notes: vec!(), inport: box inport};
-        let mut timer = time::PtTimer::Pt_start(1000, data, sequencer_callback);
-        time::Pt_Sleep(10000);
-        timer.Pt_Stop(); 
+        let mut timer = time::PtTimer::pt_start(1000, data, sequencer_callback);
+        time::pt_sleep(10000);
+        timer.pt_stop();
 
 
 
         //close out port
         let aborterr = outport.abort();
-        assert_eq!(aborterr as int, midi::PmNoError as int);
+        assert_eq!(aborterr as int, PmError::PmNoError as int);
         let outcloseerr = outport.close();
-        assert_eq!(outcloseerr as int, midi::PmNoError as int);
+        assert_eq!(outcloseerr as int, PmError::PmNoError as int);
 
         //close in port
-        let incloseerr = inport.close();
-        assert_eq!(incloseerr as int, midi::PmNoError as int);
+        // let incloseerr = inport.close();
+        // assert_eq!(incloseerr as int, PmError::PmNoError as int);
 
         //terminate midi
     	let error:midi::PmError = midi::terminate();
-    	assert_eq!(error as int, midi::PmNoError as int);
-    } 
+    	assert_eq!(error as int, PmError::PmNoError as int);
+    }
 
    #[test]
     fn test_queue() {
         let mut queue : util::PmQueue = util::PmQueue::new();
         queue.create(32, 4);
 
-        let readMidi = queue.dequeue();
-        match readMidi    {
+        let read_midi = queue.dequeue();
+        match read_midi    {
             Ok(notes) => println!("portmidi read midi note {}", notes),
-            Err(midi::PmNoError) => assert_eq!(midi::PmNoError as int, midi::PmNoError as int),
+            Err(PmError::PmNoError) => assert_eq!(PmError::PmNoError as int, PmError::PmNoError as int),
             Err(err) => panic!("portmidi read midi error {}", err)
         }
 
@@ -148,10 +148,10 @@ mod tests {
             midi::PmMessage {
                 status : 1 | 0x90, //chanell and note on
                 data1 : 36, //note number
-                data2 : 90, // velocity              
+                data2 : 90, // velocity
             }
         );
-        assert_eq!(enqueuerr as int, midi::PmNoError as int);
+        assert_eq!(enqueuerr as int, PmError::PmNoError as int);
 
         assert_eq!(queue.is_empty(), false);
         assert_eq!(queue.is_full(), false);
@@ -168,7 +168,7 @@ mod tests {
         let readqueue = queue.dequeue();
         match readqueue    {
             Ok(notes) => assert_eq!(notes.data1, 36),
-            Err(midi::PmNoError) => panic!("dequeue error no object found {}", readqueue),
+            Err(PmError::PmNoError) => panic!("dequeue error no object found {}", readqueue),
             Err(err) => panic!("portmidi read midi error {}", err)
         }
 
@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(queue.is_full(), false);
 
         let queudesterr = queue.destroy();
-        assert_eq!(queudesterr as int, midi::PmNoError as int);
+        assert_eq!(queudesterr as int, PmError::PmNoError as int);
    }
 
    #[deriving(Show)]
@@ -194,19 +194,17 @@ mod tests {
     #[test]
     fn test_timer() {
         let data : TestMutCallback = TestMutCallback{data: 0};
-        let mut timer = time::PtTimer::Pt_start(1000, data, test_callback);
-        assert_eq!(timer.Pt_Started(), true);
+        let mut timer = time::PtTimer::pt_start(1000, data, test_callback);
+        assert_eq!(timer.pt_started(), true);
 
-        println!("test_timer start time:{} ", timer.Pt_Time());
+        println!("test_timer start time:{} ", timer.pt_time());
 
-        time::Pt_Sleep(5000);
-        timer.Pt_Stop();
-        assert_eq!(timer.Pt_Started(), false);
-        println!("test_timer end time:{} ", timer.Pt_Time());
-        assert_eq!(timer.Pt_Time() >= 5000, true);
-        assert_eq!(timer.Pt_Time() < 6000, true);
+        time::pt_sleep(5000);
+        timer.pt_stop();
+        assert_eq!(timer.pt_started(), false);
+        println!("test_timer end time:{} ", timer.pt_time());
+        assert_eq!(timer.pt_time() >= 5000, true);
+        assert_eq!(timer.pt_time() < 6000, true);
         assert_eq!(data.data, 0);
     }
 }
-
-

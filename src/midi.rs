@@ -6,17 +6,17 @@
 use std::{ptr};
 use core::mem::transmute;
 use libc::c_char;
-use std::string::raw;
+use std::ops::Drop;
 
 mod ffi {
     use libc::{c_char, c_void};
 
   /**  A single PortMidiStream is a descriptor for an open MIDI device.
   */
-  pub type C_PortMidiStream = c_void; 
+  pub type C_PortMidiStream = c_void;
 
   #[doc(hidden)]
-  pub type C_PmMessage = i32 ; 
+  pub type C_PmMessage = i32 ;
 
   /**
       PmTimestamp is used to represent a millisecond clock with arbitrary
@@ -37,10 +37,10 @@ mod ffi {
       PmNoError = 0,
       PmGotData = 1, /* < A "no error" return that also indicates data available */
       PmHostError = -10000,
-      PmInvalidDeviceId = -9999, /** out of range or 
-                          * output device when input is requested or 
+      PmInvalidDeviceId = -9999, /** out of range or
+                          * output device when input is requested or
                           * input device when output is requested or
-                          * device is already opened 
+                          * device is already opened
                           */
       PmInsufficientMemory = -9998,
       PmBufferTooSmall = -9997,
@@ -70,11 +70,11 @@ mod ffi {
         pub fn Pm_OpenOutput(stream : *const *const C_PortMidiStream, outputDevice : super::C_PmDeviceID, inputDriverInfo: *const c_void, bufferSize : i32, time_proc: *const c_void, time_info: *const c_void, latency:i32) -> PmError;
         pub fn Pm_Read(stream : *const C_PortMidiStream, buffer : *mut C_PmEvent , length : i32) -> i16;
         pub fn Pm_Abort(stream : *const C_PortMidiStream) -> PmError;
-        pub fn Pm_Close(stream : *const C_PortMidiStream) -> PmError;   
-        pub fn Pm_Poll(stream : *const C_PortMidiStream) -> PmError;     
+        pub fn Pm_Close(stream : *const C_PortMidiStream) -> PmError;
+        pub fn Pm_Poll(stream : *const C_PortMidiStream) -> PmError;
         pub fn Pm_Write(stream : *const C_PortMidiStream, buffer : *const C_PmEvent , length : i32) -> PmError;
         pub fn Pm_WriteShort(stream : *const C_PortMidiStream, timestamp : C_PmTimestamp , message : C_PmMessage) -> PmError;
-   }   
+   }
 }
 
 /**
@@ -94,10 +94,10 @@ pub enum PmError {
     PmNoError = ffi::PmError::PmNoError as int,
     PmGotData = ffi::PmError::PmGotData as int, /* < A "no error" return that also indicates data available */
     PmHostError = ffi::PmError::PmHostError as int,
-    PmInvalidDeviceId = ffi::PmError::PmInvalidDeviceId as int, /** out of range or 
-                        * output device when input is requested or 
+    PmInvalidDeviceId = ffi::PmError::PmInvalidDeviceId as int, /** out of range or
+                        * output device when input is requested or
                         * input device when output is requested or
-                        * device is already opened 
+                        * device is already opened
                         */
     PmInsufficientMemory = ffi::PmError::PmInsufficientMemory as int,
     PmBufferTooSmall = ffi::PmError::PmBufferTooSmall as int,
@@ -135,30 +135,30 @@ pub fn terminate() -> PmError {
 }
 
 /**  Translate portmidi error number into human readable message.
-*    These strings are constants (set at compile time) so client has 
+*    These strings are constants (set at compile time) so client has
 *    no need to allocate storage
 */
 #[inline(never)]
 pub fn get_error_text(error_code : PmError) -> String {
-    unsafe { 
-        raw::from_buf((ffi::Pm_GetErrorText(error_code.wrap()) as *const u8))
+    unsafe {
+        String::from_raw_buf((ffi::Pm_GetErrorText(error_code.wrap()) as *const u8))
     }
 }
 
 /**  Translate portmidi host error into human readable message.
     These strings are computed at run time, so client has to allocate storage.
-    After this routine executes, the host error is cleared. 
+    After this routine executes, the host error is cleared.
 */
 #[inline(never)]
 pub fn get_host_error_text(msg : *const c_char , len : i32 ) {
-    unsafe { 
+    unsafe {
         ffi::Pm_GetHostErrorText(msg, len);
     }
 }
 
 pub const HDRLENGTH : i32 = 50;
 
-/* any host error msg will occupy less 
+/* any host error msg will occupy less
 than this number of characters */
 pub const PM_HOST_ERROR_MSG_LEN : i32 = 256;
 
@@ -170,11 +170,12 @@ pub const PM_HOST_ERROR_MSG_LEN : i32 = 256;
 */
 pub type C_PmDeviceID = i32;
 pub type PmDeviceID = int;
-pub const pmNoDevice : i32 = -1;
+pub const PMNODEVICE : i32 = -1;
 
+#[allow(non_snake_case)]
 #[deriving(Show)]
 pub struct PmDeviceInfo {
-    structVersion: int, /* < this internal structure version */ 
+    structVersion: int, /* < this internal structure version */
     interf : String, /* < underlying MIDI API, e.g. MMSystem or DirectX */
     pub name : String,    /* < device name, e.g. USB MidiSport 1x1 */
     input : int, /* < true iff input is available */
@@ -182,9 +183,10 @@ pub struct PmDeviceInfo {
     opened : int, /* < used by generic PortMidi code to do error checking on arguments */
 }
 
+#[allow(non_snake_case)]
 #[doc(hidden)]
 #[repr(C)] pub struct C_PmDeviceInfo {
-    structVersion: i32, /* < this internal structure version */ 
+    structVersion: i32, /* < this internal structure version */
     interf : *const c_char, /* < underlying MIDI API, e.g. MMSystem or DirectX */
     pub name : *const c_char,    /* < device name, e.g. USB MidiSport 1x1 */
     input : i32, /* < true iff input is available */
@@ -198,8 +200,8 @@ impl PmDeviceInfo {
         unsafe {
             PmDeviceInfo {
                 structVersion: (*cdevice_info).structVersion as int,
-                interf : raw::from_buf((*cdevice_info).interf as *const u8),
-                name : raw::from_buf((*cdevice_info).name as *const u8), 
+                interf : String::from_raw_buf((*cdevice_info).interf as *const u8),
+                name : String::from_raw_buf((*cdevice_info).name as *const u8),
                 input : (*cdevice_info).input as int,
                 output : (*cdevice_info).output as int,
                 opened : (*cdevice_info).opened as int,
@@ -210,8 +212,8 @@ impl PmDeviceInfo {
     pub fn unwrap(&self) -> C_PmDeviceInfo {
         C_PmDeviceInfo {
             structVersion: self.structVersion as i32,
-            interf :  unsafe { self.interf.to_c_str().unwrap() },
-            name :  unsafe { self.name.to_c_str().unwrap() }, 
+            interf :  unsafe { self.interf.to_c_str().into_inner() },
+            name :  unsafe { self.name.to_c_str().into_inner() },
             input : self.input as i32,
             output : self.output as i32,
             opened : self.opened as i32,
@@ -229,9 +231,9 @@ impl PmDeviceInfo {
 
 /**  Get devices count, ids range from 0 to Pm_CountDevices()-1. */
 pub fn count_devices() -> int {
-    unsafe { 
+    unsafe {
         ffi::Pm_CountDevices() as int
-    }    
+    }
 }
 
 /*
@@ -239,24 +241,24 @@ pub fn count_devices() -> int {
 
     Return the default device ID or pmNoDevice if there are no devices.
     The result (but not pmNoDevice) can be passed to Pm_OpenMidi().
-    
+
     The default device can be specified using a small application
     named pmdefaults that is part of the PortMidi distribution. This
     program in turn uses the Java Preferences object created by
     java.util.prefs.Preferences.userRoot().node("/PortMidi"); the
-    preference is set by calling 
+    preference is set by calling
         prefs.put("PM_RECOMMENDED_OUTPUT_DEVICE", prefName);
     or  prefs.put("PM_RECOMMENDED_INPUT_DEVICE", prefName);
-    
+
     In the statements above, prefName is a string describing the
     MIDI device in the form "interf, name" where interf identifies
     the underlying software system or API used by PortMdi to access
-    devices and name is the name of the device. These correspond to 
+    devices and name is the name of the device. These correspond to
     the interf and name fields of a PmDeviceInfo. (Currently supported
-    interfaces are "MMSystem" for Win32, "ALSA" for Linux, and 
+    interfaces are "MMSystem" for Win32, "ALSA" for Linux, and
     "CoreMIDI" for OS X, so in fact, there is no choice of interface.)
-    In "interf, name", the strings are actually substrings of 
-    the full interface and name strings. For example, the preference 
+    In "interf, name", the strings are actually substrings of
+    the full interface and name strings. For example, the preference
     "Core, Sport" will match a device with interface "CoreMIDI"
     and name "In USB MidiSport 1x1". It will also match "CoreMIDI"
     and "In USB MidiSport 2x2". The devices are enumerated in device
@@ -266,26 +268,26 @@ pub fn count_devices() -> int {
     the entire preference string is interpreted as a name, and the
     interface part is the empty string, which matches anything.
 
-    On the MAC, preferences are stored in 
+    On the MAC, preferences are stored in
       /Users/$NAME/Library/Preferences/com.apple.java.util.prefs.plist
     which is a binary file. In addition to the pmdefaults program,
     there are utilities that can read and edit this preference file.
 
-    On the PC, 
+    On the PC,
 
-    On Linux, 
+    On Linux,
 
 */
 pub fn get_default_input_device_id() -> PmDeviceID {
-    unsafe { 
+    unsafe {
         ffi::Pm_GetDefaultInputDeviceID() as int
-    }    
+    }
 }
 
 pub fn get_default_output_device_id() -> PmDeviceID {
-    unsafe { 
+    unsafe {
         ffi::Pm_GetDefaultOutputDeviceID() as int
-    }    
+    }
 }
 
 
@@ -320,21 +322,19 @@ pub struct PmMessage { /**< see PmEvent */
     Pm_Message() encodes a short Midi message into a 32-bit word. If data1
     and/or data2 are not present, use zero.
 
-    Pm_MessageStatus(), Pm_MessageData1(), and 
+    Pm_MessageStatus(), Pm_MessageData1(), and
     Pm_MessageData2() extract fields from a 32-bit midi message.
 */
 #[doc(hidden)]
 impl PmMessage {
-    #[allow(visible_private_types)]
     pub fn wrap(cmessage : ffi::C_PmMessage) -> PmMessage {
         PmMessage {
             status:  ((cmessage) & 0xFF) as i8,
             data1 : (((cmessage) >> 8) & 0xFF) as i8,
-            data2 : (((cmessage) >> 16) & 0xFF) as i8, 
+            data2 : (((cmessage) >> 16) & 0xFF) as i8,
         }
     }
 
-    #[allow(visible_private_types)]
     pub fn unwrap(&self) -> ffi::C_PmMessage {
         ((((self.data2 as i32) << 16) & 0xFF0000) |
           (((self.data1 as i32) << 8) & 0xFF00) |
@@ -349,75 +349,73 @@ impl PmMessage {
    structure carrying 4 bytes of the message, i.e. only the first
    PmEvent carries the status byte.
 
-   Note that MIDI allows nested messages: the so-called "real-time" MIDI 
-   messages can be inserted into the MIDI byte stream at any location, 
+   Note that MIDI allows nested messages: the so-called "real-time" MIDI
+   messages can be inserted into the MIDI byte stream at any location,
    including within a sysex message. MIDI real-time messages are one-byte
-   messages used mainly for timing (see the MIDI spec). PortMidi retains 
-   the order of non-real-time MIDI messages on both input and output, but 
+   messages used mainly for timing (see the MIDI spec). PortMidi retains
+   the order of non-real-time MIDI messages on both input and output, but
    it does not specify exactly how real-time messages are processed. This
-   is particulary problematic for MIDI input, because the input parser 
-   must either prepare to buffer an unlimited number of sysex message 
-   bytes or to buffer an unlimited number of real-time messages that 
+   is particulary problematic for MIDI input, because the input parser
+   must either prepare to buffer an unlimited number of sysex message
+   bytes or to buffer an unlimited number of real-time messages that
    arrive embedded in a long sysex message. To simplify things, the input
-   parser is allowed to pass real-time MIDI messages embedded within a 
-   sysex message, and it is up to the client to detect, process, and 
+   parser is allowed to pass real-time MIDI messages embedded within a
+   sysex message, and it is up to the client to detect, process, and
    remove these messages as they arrive.
 
    When receiving sysex messages, the sysex message is terminated
    by either an EOX status byte (anywhere in the 4 byte messages) or
    by a non-real-time status byte in the low order byte of the message.
-   If you get a non-real-time status byte but there was no EOX byte, it 
+   If you get a non-real-time status byte but there was no EOX byte, it
    means the sysex message was somehow truncated. This is not
    considered an error; e.g., a missing EOX can result from the user
    disconnecting a MIDI cable during sysex transmission.
 
-   A real-time message can occur within a sysex message. A real-time 
-   message will always occupy a full PmEvent with the status byte in 
+   A real-time message can occur within a sysex message. A real-time
+   message will always occupy a full PmEvent with the status byte in
    the low-order byte of the PmEvent message field. (This implies that
    the byte-order of sysex bytes and real-time message bytes may not
    be preserved -- for example, if a real-time message arrives after
    3 bytes of a sysex message, the real-time message will be delivered
    first. The first word of the sysex message will be delivered only
    after the 4th byte arrives, filling the 4-byte PmEvent message field.
-   
+
    The timestamp field is observed when the output port is opened with
    a non-zero latency. A timestamp of zero means "use the current time",
    which in turn means to deliver the message with a delay of
    latency (the latency parameter used when opening the output port.)
-   Do not expect PortMidi to sort data according to timestamps -- 
-   messages should be sent in the correct order, and timestamps MUST 
+   Do not expect PortMidi to sort data according to timestamps --
+   messages should be sent in the correct order, and timestamps MUST
    be non-decreasing. See also "Example" for Pm_OpenOutput() above.
 
-   A sysex message will generally fill many PmEvent structures. On 
+   A sysex message will generally fill many PmEvent structures. On
    output to a PortMidiStream with non-zero latency, the first timestamp
-   on sysex message data will determine the time to begin sending the 
-   message. PortMidi implementations may ignore timestamps for the 
-   remainder of the sysex message. 
-   
-   On input, the timestamp ideally denotes the arrival time of the 
-   status byte of the message. The first timestamp on sysex message 
-   data will be valid. Subsequent timestamps may denote 
-   when message bytes were actually received, or they may be simply 
+   on sysex message data will determine the time to begin sending the
+   message. PortMidi implementations may ignore timestamps for the
+   remainder of the sysex message.
+
+   On input, the timestamp ideally denotes the arrival time of the
+   status byte of the message. The first timestamp on sysex message
+   data will be valid. Subsequent timestamps may denote
+   when message bytes were actually received, or they may be simply
    copies of the first timestamp.
 
-   Timestamps for nested messages: If a real-time message arrives in 
-   the middle of some other message, it is enqueued immediately with 
-   the timestamp corresponding to its arrival time. The interrupted 
-   non-real-time message or 4-byte packet of sysex data will be enqueued 
+   Timestamps for nested messages: If a real-time message arrives in
+   the middle of some other message, it is enqueued immediately with
+   the timestamp corresponding to its arrival time. The interrupted
+   non-real-time message or 4-byte packet of sysex data will be enqueued
    later. The timestamp of interrupted data will be equal to that of
    the interrupting real-time message to insure that timestamps are
    non-decreasing.
  */
-#[allow(visible_private_types)]
 #[deriving(Clone, PartialEq, Eq, Decodable, Encodable, Show)]
 pub  struct PmEvent {
     pub message : PmMessage,
     pub timestamp : ffi::C_PmTimestamp,
-} 
+}
 
 #[doc(hidden)]
 impl PmEvent {
-    #[allow(visible_private_types)]
     pub fn wrap(cevent : ffi::C_PmEvent) -> PmEvent {
         PmEvent {
             message:  PmMessage::wrap(cevent.message),
@@ -425,7 +423,6 @@ impl PmEvent {
         }
     }
 
-    #[allow(visible_private_types)]
     pub fn unwrap(&self) -> ffi::C_PmEvent {
         ffi::C_PmEvent {
             message:  self.message.unwrap(),
@@ -438,8 +435,17 @@ impl PmEvent {
 /// Representation of an input midi port.
 pub struct PmInputPort {
     c_pm_stream : *const ffi::C_PortMidiStream,
-    inputDevice : C_PmDeviceID,
-    bufferSize : i32,
+    input_device : C_PmDeviceID,
+    buffer_size : i32,
+    opened : bool
+}
+
+impl Drop for PmInputPort {
+  fn drop (&mut self) {
+    if self.opened {
+      self.close();
+    }
+  }
 }
 
 impl PmInputPort {
@@ -451,16 +457,23 @@ impl PmInputPort {
     pub fn new(input_device : PmDeviceID, buffer_size: int) -> PmInputPort {
         PmInputPort {
             c_pm_stream : ptr::null(),
-            inputDevice : input_device as i32,
-            bufferSize : buffer_size as i32,
+            input_device : input_device as i32,
+            buffer_size : buffer_size as i32,
+            opened : false
         }
     }
 
     #[inline(never)]
     pub fn open(&mut self)  -> PmError {
-        unsafe {
-            PmError::unwrap(ffi::Pm_OpenInput(&self.c_pm_stream, self.inputDevice, ptr::null(), self.bufferSize, ptr::null(), ptr::null()))
+        let error = unsafe {
+            PmError::unwrap(ffi::Pm_OpenInput(&self.c_pm_stream, self.input_device, ptr::null(), self.buffer_size, ptr::null(), ptr::null()))
+        };
+
+        if error == PmError::PmNoError {
+          self.opened = true
         }
+
+        error
     }
 
     /**
@@ -469,11 +482,11 @@ impl PmInputPort {
     *    asynchronously where the client does not
     *    explicitly call a function, and therefore cannot receive an error code.
     *    The client can test for a pending error using has_host_error(). If true,
-    *    the error can be accessed and cleared by calling get_Error_text(). 
+    *    the error can be accessed and cleared by calling get_Error_text().
     *    Errors are also cleared by calling other functions that can return
     *    errors, e.g. open_input(), open_output(), read(), write(). The
     *    client does not need to call Pm_HasHostError(). Any pending error will be
-    *    reported the next time the client performs an explicit function call on 
+    *    reported the next time the client performs an explicit function call on
     *    the stream, e.g. an input or output operation. Until the error is cleared,
     *    no new error codes will be obtained, even for a different stream.
     */
@@ -490,19 +503,19 @@ impl PmInputPort {
         Retur the note event if available or Err(pmNoError) if no midi event is avaible or Err() if an error occurs.
 
         Pm_Read() retrieves midi data into a buffer, and returns the number
-        of events read. Result is a non-negative number unless an error occurs, 
+        of events read. Result is a non-negative number unless an error occurs,
         in which case a PmError value will be returned.
 
         Buffer Overflow
 
-        The problem: if an input overflow occurs, data will be lost, ultimately 
-        because there is no flow control all the way back to the data source. 
-        When data is lost, the receiver should be notified and some sort of 
-        graceful recovery should take place, e.g. you shouldn't resume receiving 
+        The problem: if an input overflow occurs, data will be lost, ultimately
+        because there is no flow control all the way back to the data source.
+        When data is lost, the receiver should be notified and some sort of
+        graceful recovery should take place, e.g. you shouldn't resume receiving
         in the middle of a long sysex message.
 
-        With a lock-free fifo, which is pretty much what we're stuck with to 
-        enable portability to the Mac, it's tricky for the producer and consumer 
+        With a lock-free fifo, which is pretty much what we're stuck with to
+        enable portability to the Mac, it's tricky for the producer and consumer
         to synchronously reset the buffer and resume normal operation.
 
         Solution: the buffer managed by PortMidi will be flushed when an overflow
@@ -513,7 +526,7 @@ impl PmInputPort {
 
     */
     pub fn read(&mut self) -> Result<PmEvent, PmError> {
-       
+
         //get one note a the time
          let mut pevent : ffi::C_PmEvent = ffi::C_PmEvent {
             message : 0,
@@ -530,9 +543,9 @@ impl PmInputPort {
             _ => Err(unsafe { transmute::<i16, PmError>(nbnote) })
         }
     }
- 
+
     /**
-        Pm_Poll() tests whether input is available, 
+        Pm_Poll() tests whether input is available,
         returning pmGotData, pmNoError, or an error value.
     */
     pub fn poll(&self)  -> PmError  {
@@ -540,14 +553,14 @@ impl PmInputPort {
             PmError::unwrap(ffi::Pm_Poll(self.c_pm_stream))
         }
     }
-   
+
     /**
         Pm_Close() closes a midi stream, flushing any pending buffers.
-        (PortMidi attempts to close open streams when the application 
+        (PortMidi attempts to close open streams when the application
         exits -- this is particularly difficult under Windows.)
     */
     pub fn close(&mut self)  -> PmError  {
-//      println!("portmidi::midi inport close");
+     println!("portmidi::midi inport close");
         unsafe {
             PmError::unwrap(ffi::Pm_Close(self.c_pm_stream))
         }
@@ -558,8 +571,17 @@ impl PmInputPort {
 /// Representation of an output midi port.
 pub struct PmOutputPort {
     c_pm_stream : *const ffi::C_PortMidiStream,
-    outputDevice : C_PmDeviceID,
-    bufferSize : i32,
+    output_device : C_PmDeviceID,
+    buffer_size : i32,
+    opened : bool
+}
+
+impl Drop for PmOutputPort {
+  fn drop (&mut self) {
+    if self.opened {
+      self.close();
+    }
+  }
 }
 
 impl PmOutputPort {
@@ -571,17 +593,23 @@ impl PmOutputPort {
     pub fn new(output_device : PmDeviceID, buffer_size: int) -> PmOutputPort {
         PmOutputPort {
             c_pm_stream : ptr::null(),
-            outputDevice : output_device as i32,
-            bufferSize : buffer_size as i32,
+            output_device : output_device as i32,
+            buffer_size : buffer_size as i32,
         }
     }
 
     #[inline(never)]
     pub fn open(&mut self)  -> PmError {
 
-        unsafe {
-            PmError::unwrap(ffi::Pm_OpenOutput(&self.c_pm_stream, self.outputDevice, ptr::null(), self.bufferSize, ptr::null(), ptr::null(), 0))
+        let error = unsafe {
+            PmError::unwrap(ffi::Pm_OpenOutput(&self.c_pm_stream, self.output_device, ptr::null(), self.buffer_size, ptr::null(), ptr::null(), 0))
+        };
+
+        if error == PmError::PmNoError {
+          self.opened = true
         }
+
+        error
     }
 
     /**
@@ -590,11 +618,11 @@ impl PmOutputPort {
     *    asynchronously where the client does not
     *    explicitly call a function, and therefore cannot receive an error code.
     *    The client can test for a pending error using has_host_error(). If true,
-    *    the error can be accessed and cleared by calling get_Error_text(). 
+    *    the error can be accessed and cleared by calling get_Error_text().
     *    Errors are also cleared by calling other functions that can return
     *    errors, e.g. open_input(), open_output(), read(), write(). The
     *    client does not need to call Pm_HasHostError(). Any pending error will be
-    *    reported the next time the client performs an explicit function call on 
+    *    reported the next time the client performs an explicit function call on
     *    the stream, e.g. an input or output operation. Until the error is cleared,
     *    no new error codes will be obtained, even for a different stream.
     */
@@ -619,10 +647,10 @@ impl PmOutputPort {
             PmError::unwrap(ffi::Pm_Abort(self.c_pm_stream))
         }
     }
-     
+
     /**
         Pm_Close() closes a midi stream, flushing any pending buffers.
-        (PortMidi attempts to close open streams when the application 
+        (PortMidi attempts to close open streams when the application
         exits -- this is particularly difficult under Windows.)
     */
     pub fn close(&mut self)  -> PmError  {
@@ -631,15 +659,15 @@ impl PmOutputPort {
         }
     }
 
-    /** 
+    /**
         Pm_Write() writes midi data from a buffer. This may contain:
-            - short messages 
-        or 
+            - short messages
+        or
             - sysex messages that are converted into a sequence of PmEvent
               structures, e.g. sending data from a file or forwarding them
               from midi input.
 
-        Use Pm_WriteSysEx() to write a sysex message stored as a contiguous 
+        Use Pm_WriteSysEx() to write a sysex message stored as a contiguous
         array of bytes.
 
         Sysex data may contain embedded real-time messages.
@@ -653,7 +681,7 @@ impl PmOutputPort {
 
     /**
         Pm_WriteShort() writes a timestamped non-system-exclusive midi message.
-        Messages are delivered in order as received, and timestamps must be 
+        Messages are delivered in order as received, and timestamps must be
         non-decreasing. (But timestamps are ignored if the stream was opened
         with latency = 0.)
     */

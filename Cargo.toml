@@ -8,3 +8,6 @@ authors = ["Philippe Delrieu <philippe.delrieu@free.fr>"]
 name = "portmidi"
 crate-type = ["dylib", "rlib"]
 path = "src/lib.rs"
+
+[dependencies]
+time = "*"
