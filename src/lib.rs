@@ -109,10 +109,11 @@ mod tests {
 
 
         //close out port
-        let aborterr = outport.abort();
-        assert_eq!(aborterr as int, PmError::PmNoError as int);
-        let outcloseerr = outport.close();
-        assert_eq!(outcloseerr as int, PmError::PmNoError as int);
+        // let aborterr = outport.abort();
+        // assert_eq!(aborterr as int, PmError::PmNoError as int);
+
+        // let outcloseerr = outport.close();
+        // assert_eq!(outcloseerr as int, PmError::PmNoError as int);
 
         //close in port
         // let incloseerr = inport.close();
